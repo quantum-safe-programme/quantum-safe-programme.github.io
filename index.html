@@ -316,7 +316,7 @@
     </div>
     <div class="stamp">
       <span class="k">Last updated</span>
-      <span class="v" id="stamp-date">2 Aug 2026</span>
+      <span class="v" id="stamp-date">3 Aug 2026</span>
     </div>
   </header>
   <p class="credit-top">Designed and built by Peng Chong, Bryan Lee, Daniel Lim and Elden Sim.</p>
@@ -343,7 +343,7 @@
       <h2 id="sec-ops">Engineering Guides</h2>
       <span class="rule"></span>
     </div>
-    <p class="secsub">Step-by-step guidance for putting quantum-safe key exchange into service on the platforms already in the estate. Each guide covers version requirements, configuration, testing and verification.</p>
+    <p class="secsub">Step-by-step guidance for putting quantum-safe technologies into service. Each guide covers version requirements, configuration, testing and verification.</p>
     <div class="grid" id="ops-host"></div>
   </section>
 
@@ -473,21 +473,32 @@ const GUIDES = [
   {
     url: "pqc-ssh-ubuntu-2604.html",
     kicker: "Engineering guide",
-    title: "SSH quantum-safe key exchange",
+    title: "Post-Quantum SSH",
     desc: "Enabling hybrid ML-KEM key exchange on OpenSSH servers and clients, with host-key policy, client compatibility and verification steps.",
-    updated: "Updated 2 Aug 2026",
+    tags: ["OpenSSH", "mlkem768x25519", "Hybrid KEX"],
+    updated: "Updated 1 Aug 2026",
     status: "live",
     icon: "terminal"
   },
   {
-    url: "pqc-nginx-ubuntu-2604.html",
+    url: "pqc-tls-nginx-ubuntu-2604.html",
     kicker: "Engineering guide",
-    title: "NGINX quantum-safe TLS",
+    title: "Post-Quantum TLS with NGINX",
     desc: "Configuring hybrid TLS 1.3 key exchange on NGINX, including OpenSSL provider setup, cipher and group selection, certificate handling and handshake verification.",
     tags: ["NGINX", "TLS 1.3", "X25519MLKEM768"],
-    updated: "Updated 2 Aug 2026",
+    updated: "Updated 3 Aug 2026",
     status: "live",
     icon: "server"
+  },
+  {
+    url: "pqc-ipsec-strongswan-ubuntu-2604.html",
+    kicker: "Engineering guide",
+    title: "Post-Quantum IPsec with strongSwan",
+    desc: "Configuring hybrid ML-KEM key exchange for IPsec/IKEv2 with strongSwan on Ubuntu 26.04 LTS, including proposal configuration, certificate handling and tunnel verification.",
+    tags: ["strongSwan", "IKEv2", "ML-KEM"],
+    updated: "Updated 3 Aug 2026",
+    status: "live",
+    icon: "tunnel"
   }
 ];
 
@@ -499,6 +510,7 @@ const ARROW = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const ICONS = {
   terminal: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="19" height="16" rx="2.5"/><path d="M7 10l3 2.5-3 2.5M13 15.5h4"/></svg>',
   server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="3.5" width="19" height="7" rx="2"/><rect x="2.5" y="13.5" width="19" height="7" rx="2"/><path d="M6.5 7h.01M6.5 17h.01"/></svg>',
+  tunnel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4M17 12h4M9.5 12a2.5 2.5 0 0 1 5 0"/><path d="M7 12a5 5 0 0 1 10 0"/></svg>',
   book: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4.5A2 2 0 0 1 6 2.5h13v19H6a2 2 0 0 1-2-2Z"/><path d="M4 17.5h15"/></svg>'
 };
 

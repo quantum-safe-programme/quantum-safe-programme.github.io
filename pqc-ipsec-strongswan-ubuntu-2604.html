@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Post-Quantum IPsec with strongSwan on Ubuntu 26.04 LTS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Cpath d='M24 3 L41 10 V23 C41 33.5 34 40.5 24 45 C14 40.5 7 33.5 7 23 V10 Z' fill='%23F4F7FB' stroke='%231E5BA8' stroke-width='2.4' stroke-linejoin='round'/%3E%3Cg stroke='%231E5BA8' stroke-width='1.6' stroke-linecap='round'%3E%3Cline x1='24' y1='15' x2='24' y2='33'/%3E%3Cline x1='15.5' y1='20' x2='32.5' y2='28'/%3E%3Cline x1='32.5' y1='20' x2='15.5' y2='28'/%3E%3C/g%3E%3Ccircle cx='24' cy='15' r='3.2' fill='%2313294B'/%3E%3Ccircle cx='15.5' cy='20' r='3.2' fill='%231E5BA8'/%3E%3Ccircle cx='32.5' cy='20' r='3.2' fill='%231E5BA8'/%3E%3Ccircle cx='15.5' cy='28' r='3.2' fill='%231E5BA8'/%3E%3Ccircle cx='32.5' cy='28' r='3.2' fill='%231E5BA8'/%3E%3Ccircle cx='24' cy='33' r='3.6' fill='%2313294B'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --bg:#FFFFFF;
+    --surface:#F4F7FB;
+    --surface-2:#EBF2FB;
+    --line:#B7C4DA;
+    --line-soft:#DDE6F2;
+    --ink:#13294B;
+    --ink-2:#334155;
+    --muted:#5B6B87;
+    --muted-2:#667085;
+    --accent:#1E5BA8;
+    --accent-soft:#C9D9F0;
+
+    --pub:#1F7A5A;   --pub-bg:#E6F2ED;
+    --draft:#A96A15; --draft-bg:#F7EEDD;
+    --plan:#5B6B87;  --plan-bg:#EAEFF6;
+
+    --code-bg:#F4F7FB;
+    --code-ink:#13294B;
+
+    --radius:12px;
+    --shadow:0 1px 2px rgba(19,41,75,.06), 0 8px 24px rgba(19,41,75,.06);
+    color-scheme:light;
+  }
+
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#0B1420;
+      --surface:#111D2E;
+      --surface-2:#152538;
+      --line:#2C405C;
+      --line-soft:#1D2E45;
+      --ink:#EAF0F9;
+      --ink-2:#C7D3E6;
+      --muted:#93A5C4;
+      --muted-2:#7A8CAC;
+      --accent:#5B9CE6;
+      --accent-soft:#1E3A5C;
+      --pub:#4FD69B;   --pub-bg:#123526;
+      --draft:#F2BE5C; --draft-bg:#3A2C14;
+      --plan:#93A5C4;  --plan-bg:#1B283C;
+      --code-bg:#0E1A29;
+      --code-ink:#DCE7F7;
+      --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme:dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0B1420;
+    --surface:#111D2E;
+    --surface-2:#152538;
+    --line:#2C405C;
+    --line-soft:#1D2E45;
+    --ink:#EAF0F9;
+    --ink-2:#C7D3E6;
+    --muted:#93A5C4;
+    --muted-2:#7A8CAC;
+    --accent:#5B9CE6;
+    --accent-soft:#1E3A5C;
+    --pub:#4FD69B;   --pub-bg:#123526;
+    --draft:#F2BE5C; --draft-bg:#3A2C14;
+    --plan:#93A5C4;  --plan-bg:#1B283C;
+    --code-bg:#0E1A29;
+    --code-ink:#DCE7F7;
+    --shadow:0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme:dark;
+  }
+  :root[data-theme="light"]{ color-scheme:light; }
+
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;scroll-padding-top:24px}
+  body{
+    margin:0;background:var(--bg);color:var(--ink-2);
+    font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased;
+    transition:background-color .15s ease,color .15s ease;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{text-decoration:underline}
+
+  /* ---------- Theme toggle ---------- */
+  #theme-toggle{
+    position:fixed;top:20px;right:20px;z-index:60;
+    width:40px;height:40px;padding:0;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg);border:1px solid var(--line);border-radius:999px;
+    color:var(--ink-2);cursor:pointer;
+    box-shadow:0 1px 2px rgba(19,41,75,.08), 0 4px 12px rgba(19,41,75,.08);
+    transition:border-color .15s ease,color .15s ease,transform .12s ease;
+  }
+  #theme-toggle:hover{border-color:var(--accent);color:var(--accent);transform:translateY(-1px)}
+  #theme-toggle:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(30,91,168,.20)}
+  #theme-toggle svg{width:18px;height:18px;position:absolute}
+  #theme-toggle .icon-moon{display:none}
+  :root[data-theme="dark"] #theme-toggle .icon-sun{display:none}
+  :root[data-theme="dark"] #theme-toggle .icon-moon{display:block}
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]) #theme-toggle .icon-sun{display:none}
+    :root:not([data-theme="light"]) #theme-toggle .icon-moon{display:block}
+  }
+  @media (max-width:520px){
+    #theme-toggle{top:14px;right:14px;width:36px;height:36px}
+    #theme-toggle svg{width:16px;height:16px}
+  }
+
+  .wrap{max-width:1180px;margin:0 auto;padding:40px 24px 72px}
+
+  /* ---------- Header ---------- */
+  .eyebrow{
+    font-family:"IBM Plex Mono",monospace;font-size:12px;font-weight:600;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin:0 0 12px;
+  }
+  .head{
+    display:flex;flex-wrap:wrap;gap:24px;align-items:flex-end;justify-content:space-between;
+    padding-bottom:22px;border-bottom:1px solid var(--line);
+  }
+  .brand{display:flex;gap:16px;align-items:flex-start;flex:1 1 460px}
+  .mark{width:52px;height:52px;flex-shrink:0;margin-top:3px;filter:drop-shadow(0 2px 6px rgba(19,41,75,.10))}
+  h1{
+    font-family:"Space Grotesk",sans-serif;font-weight:700;color:var(--ink);
+    font-size:clamp(28px,4.4vw,40px);line-height:1.05;margin:0 0 8px;letter-spacing:-.01em;
+  }
+  .lede{max-width:60ch;color:var(--muted);font-size:15.5px;margin:0}
+  .stamp{text-align:right;flex-shrink:0;min-width:160px}
+  .stamp .k{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted-2);display:block}
+  .stamp .v{font-family:"Space Grotesk",sans-serif;color:var(--ink);font-weight:600;font-size:15px;margin-top:2px;display:block}
+  @media (max-width:520px){ .mark{width:40px;height:40px;margin-top:5px} }
+
+  /* ---------- Summary band ---------- */
+  .metrics{
+    display:flex;flex-wrap:wrap;gap:10px;margin:26px 0 0;padding:20px 22px;
+    background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius);
+  }
+  .stat{
+    display:flex;flex-direction:column;gap:2px;padding:12px 16px;min-width:150px;flex:1 1 150px;
+    background:var(--bg);border:1px solid var(--line-soft);border-left:3px solid var(--b,var(--accent));border-radius:9px;
+  }
+  .stat .n{font-family:"Space Grotesk",sans-serif;font-weight:700;font-size:19px;color:var(--ink);line-height:1.15;word-break:break-word}
+  .stat .l{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);margin-top:3px}
+
+  /* ---------- Layout ---------- */
+  .cols{display:grid;grid-template-columns:212px 1fr;gap:44px;margin-top:40px;align-items:start}
+  nav.toc{position:sticky;top:24px}
+  nav.toc .lab{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;
+    color:var(--muted-2);display:block;margin-bottom:12px;
+  }
+  nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:toc}
+  nav.toc li{counter-increment:toc;margin-bottom:2px}
+  nav.toc a{
+    display:block;padding:6px 10px 6px 0;font-size:13.5px;color:var(--muted);
+    border-left:2px solid var(--line-soft);padding-left:12px;line-height:1.35;
+  }
+  nav.toc a::before{content:counter(toc) ". ";font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted-2)}
+  nav.toc a:hover{color:var(--accent);border-left-color:var(--accent);text-decoration:none}
+  nav.toc a.on{color:var(--ink);border-left-color:var(--accent);font-weight:600}
+  @media (max-width:980px){
+    .cols{grid-template-columns:1fr;gap:0}
+    nav.toc{position:static;margin-bottom:8px;padding:18px 20px;background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius)}
+    nav.toc ol{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:2px 14px}
+  }
+
+  /* ---------- Typography ---------- */
+  section.doc{padding-top:8px}
+  section.doc > section{padding-top:34px;margin-top:34px;border-top:1px solid var(--line)}
+  section.doc > section:first-child{border-top:none;margin-top:0;padding-top:0}
+  h2{
+    font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:23px;color:var(--ink);
+    margin:0 0 6px;letter-spacing:-.005em;line-height:1.2;
+  }
+  h2 .num{font-family:"IBM Plex Mono",monospace;font-size:14px;font-weight:600;color:var(--accent);margin-right:10px;letter-spacing:.04em}
+  h3{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:16.5px;color:var(--ink);margin:28px 0 8px}
+  h4{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:15px;color:var(--ink);margin:22px 0 6px}
+  p{margin:0 0 14px;max-width:74ch}
+  ul,ol.plain{margin:0 0 16px;padding-left:20px;max-width:74ch}
+  li{margin-bottom:7px}
+  strong{color:var(--ink);font-weight:600}
+  .sect-sub{color:var(--muted);font-size:14px;margin:0 0 20px;max-width:70ch}
+
+  /* ---------- Code ---------- */
+  .code{position:relative;margin:0 0 18px}
+  .code pre{
+    margin:0;padding:15px 56px 15px 16px;background:var(--code-bg);
+    border:1px solid var(--line-soft);border-left:3px solid var(--accent);border-radius:10px;
+    overflow-x:auto;
+  }
+  .code code{
+    font-family:"IBM Plex Mono",monospace;font-size:12.8px;line-height:1.65;
+    color:var(--code-ink);white-space:pre;
+  }
+  .copy{
+    position:absolute;top:9px;right:9px;font-family:"IBM Plex Mono",monospace;
+    font-size:10px;letter-spacing:.09em;text-transform:uppercase;font-weight:600;
+    color:var(--muted);background:var(--bg);border:1px solid var(--line-soft);
+    border-radius:6px;padding:4px 9px;cursor:pointer;transition:color .12s,border-color .12s;
+  }
+  .copy:hover{color:var(--accent);border-color:var(--accent)}
+  .copy:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(30,91,168,.20)}
+  .copy.done{color:var(--pub);border-color:var(--pub)}
+  code.inline{
+    font-family:"IBM Plex Mono",monospace;font-size:12.6px;color:var(--ink);
+    background:var(--surface-2);border:1px solid var(--line-soft);border-radius:5px;padding:1px 5px;
+  }
+  .out{ --accent-swap:var(--muted) }
+  .out pre{border-left-color:var(--muted-2)}
+
+  /* ---------- Tables ---------- */
+  .tblwrap{overflow-x:auto;margin:0 0 18px;border:1px solid var(--line-soft);border-radius:var(--radius)}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:520px}
+  th{
+    text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);
+    padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line-soft);
+  }
+  td{padding:12px 16px;border-bottom:1px solid var(--line-soft);color:var(--ink-2);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td code{font-family:"IBM Plex Mono",monospace;font-size:12.4px;color:var(--ink)}
+
+  .pill{
+    font-size:11px;font-weight:600;letter-spacing:.02em;padding:3px 10px;border-radius:999px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;
+  }
+  .pill::before{content:"";width:6px;height:6px;border-radius:50%}
+  .pill.safe{color:var(--pub);background:var(--pub-bg)}
+  .pill.safe::before{background:var(--pub)}
+  .pill.classical{color:var(--draft);background:var(--draft-bg)}
+  .pill.classical::before{background:var(--draft)}
+
+  /* ---------- Callouts ---------- */
+  .note{
+    padding:16px 18px;border-radius:10px;background:var(--surface);
+    border:1px solid var(--line-soft);border-left:3px solid var(--accent);margin:0 0 18px;
+  }
+  .note.warn{border-left-color:var(--draft);background:var(--draft-bg)}
+  .note.warn .nt{color:var(--draft)}
+  .note .nt{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.11em;text-transform:uppercase;
+    font-weight:600;color:var(--accent);display:block;margin-bottom:6px;
+  }
+  .note p:last-child{margin-bottom:0}
+
+  /* ---------- Algorithm cards ---------- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin:0 0 20px}
+  .card{
+    background:var(--bg);border:1px solid var(--line-soft);border-radius:var(--radius);
+    border-top:3px solid var(--b,var(--accent));padding:16px 16px 14px;
+    transition:transform .14s,box-shadow .14s;
+  }
+  .card:hover{transform:translateY(-2px);box-shadow:var(--shadow)}
+  .card .docid{font-family:"IBM Plex Mono",monospace;font-size:12.6px;font-weight:600;color:var(--accent);word-break:break-all;margin-bottom:6px}
+  .card .t{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:14.5px;color:var(--ink);margin-bottom:6px}
+  .card .d{font-size:13.2px;color:var(--muted);line-height:1.5}
+  .card .tag{
+    display:inline-block;margin-top:10px;font-family:"IBM Plex Mono",monospace;font-size:10px;
+    letter-spacing:.09em;text-transform:uppercase;color:var(--muted);
+    background:var(--surface);border:1px solid var(--line-soft);padding:3px 8px;border-radius:6px;
+  }
+
+  /* ---------- Test blocks ---------- */
+  .test{margin:0 0 26px;padding:18px 20px;background:var(--surface);border:1px solid var(--line-soft);border-radius:var(--radius)}
+  .test-h{display:flex;align-items:baseline;gap:11px;margin-bottom:4px;flex-wrap:wrap}
+  .test-n{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;font-weight:600;letter-spacing:.09em;
+    text-transform:uppercase;color:#fff;background:var(--accent);padding:3px 9px;border-radius:6px;
+  }
+  .test-t{font-family:"Space Grotesk",sans-serif;font-weight:600;font-size:16px;color:var(--ink)}
+  .test .code pre{background:var(--bg)}
+
+  /* ---------- Checklist ---------- */
+  .check{list-style:none;padding:0;margin:0 0 18px;max-width:74ch}
+  .check li{position:relative;padding-left:28px;margin-bottom:9px}
+  .check li::before{
+    content:"";position:absolute;left:0;top:5px;width:13px;height:13px;
+    border:1.5px solid var(--line);border-radius:3px;background:var(--bg);
+  }
+
+  /* ---------- Footer ---------- */
+  footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--line);font-size:12.5px;color:var(--muted-2);line-height:1.7}
+  footer b{color:var(--muted)}
+  footer ul{padding-left:18px;margin:8px 0 0;max-width:none}
+  footer li{margin-bottom:4px}
+  .credit{margin-top:16px;font-size:12px;color:var(--muted-2)}
+
+  @media (prefers-reduced-motion:reduce){ *{transition:none !important} html{scroll-behavior:auto} }
+  @media print{
+    #theme-toggle,nav.toc,.copy{display:none}
+    .cols{grid-template-columns:1fr}
+    .card:hover{transform:none;box-shadow:none}
+  }
+</style>
+</head>
+<body>
+<button id="theme-toggle" type="button" aria-label="Switch to dark mode" title="Switch to dark mode">
+  <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.5 12H2M22 12h-2.5M5.6 5.6 7.3 7.3M16.7 16.7l1.7 1.7M18.4 5.6l-1.7 1.7M7.3 16.7l-1.7 1.7"/></svg>
+  <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5Z"/></svg>
+</button>
+
+<div class="wrap">
+
+  <header class="head">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 48 48" role="img" aria-label="Quantum-safe mark">
+        <path d="M24 3 L41 10 V23 C41 33.5 34 40.5 24 45 C14 40.5 7 33.5 7 23 V10 Z" fill="var(--surface-2)" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+        <g stroke="var(--accent)" stroke-width="1.4" stroke-linecap="round">
+          <line x1="24" y1="15" x2="24" y2="33"/>
+          <line x1="15.5" y1="20" x2="32.5" y2="28"/>
+          <line x1="32.5" y1="20" x2="15.5" y2="28"/>
+        </g>
+        <circle cx="24" cy="15" r="3" fill="var(--ink)"/>
+        <circle cx="15.5" cy="20" r="3" fill="var(--accent)"/>
+        <circle cx="32.5" cy="20" r="3" fill="var(--accent)"/>
+        <circle cx="15.5" cy="28" r="3" fill="var(--accent)"/>
+        <circle cx="32.5" cy="28" r="3" fill="var(--accent)"/>
+        <circle cx="24" cy="33" r="3.4" fill="var(--ink)"/>
+      </svg>
+      <div>
+        <p class="eyebrow">Post-Quantum Cryptography &middot; Engineering Guide</p>
+        <h1>Post-Quantum IPsec with strongSwan on Ubuntu 26.04 LTS</h1>
+        <p class="lede">Enabling, enforcing and testing hybrid ML-KEM key exchange in IKEv2. Scoped to key exchange only. Peer authentication remains classical.</p>
+      </div>
+    </div>
+    <div class="stamp">
+      <span class="k">Last Updated</span>
+      <span class="v">3 Aug 2026</span>
+      <span class="k" style="margin-top:10px">Applies to</span>
+      <span class="v">Ubuntu 26.04 LTS</span>
+    </div>
+  </header>
+
+  <section class="metrics" aria-label="At a glance">
+    <div class="stat"><span class="n">strongSwan 6.0.4</span><span class="l">Packaged version</span></div>
+    <div class="stat" style="--b:var(--pub)"><span class="n">x25519<br>-ke1_mlkem768</span><span class="l">Hybrid key exchange</span></div>
+    <div class="stat" style="--b:var(--draft)"><span class="n">Off by default</span><span class="l">Configuration required</span></div>
+    <div class="stat" style="--b:var(--draft)"><span class="n">ECDSA &middot; classical</span><span class="l">Peer authentication</span></div>
+  </section>
+
+  <div class="cols">
+
+    <nav class="toc" aria-label="Contents">
+      <span class="lab">Contents</span>
+      <ol>
+        <li><a href="#s1">The starting position</a></li>
+        <li><a href="#s2">Verify the baseline</a></li>
+        <li><a href="#s3">Configure the gateway</a></li>
+        <li><a href="#s4">Configure the remote peer</a></li>
+        <li><a href="#s5">Testing</a></li>
+        <li><a href="#s6">Compatibility checklist</a></li>
+        <li><a href="#s7">Evidence to record</a></li>
+        <li><a href="#s8">What this does not cover</a></li>
+        <li><a href="#s9">Command reference</a></li>
+      </ol>
+    </nav>
+
+    <section class="doc">
+
+      <!-- 1 -->
+      <section id="s1">
+        <h2><span class="num">01</span>The starting position</h2>
+        <p class="sect-sub">Ubuntu 26.04 LTS ships strongSwan 6.0.4. The code supports ML-KEM, but nothing is quantum-safe until you write a proposal string on both peers.</p>
+
+        <p>This is the opposite of the SSH position. With OpenSSH the work is verifying an inherited default and stopping it from regressing. With strongSwan the work is deliberate configuration, applied symmetrically to both ends of every tunnel, because a proposal only takes effect where both peers agree on it.</p>
+
+        <p>Three pieces make the hybrid exchange possible. RFC 9242 adds the <code class="inline">IKE_INTERMEDIATE</code> exchange, which carries payloads too large for the initial exchange. RFC 9370 allows up to seven additional key exchanges beyond the first. FIPS 203 defines ML-KEM itself. strongSwan 6.0 implements all three.</p>
+
+        <h3>1.1 What is and is not quantum-safe</h3>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Stage</th><th>Typical configuration</th><th>Status</th></tr></thead>
+            <tbody>
+              <tr><td>IKE key exchange, default</td><td><code>ecp384</code> or <code>x25519</code> alone</td><td><span class="pill classical">Classical only</span></td></tr>
+              <tr><td>IKE key exchange, configured</td><td><code>x25519-ke1_mlkem768</code></td><td><span class="pill safe">Hybrid, quantum-safe</span></td></tr>
+              <tr><td>Child SA key exchange (PFS)</td><td><code>ecp384-ke1_mlkem768</code></td><td><span class="pill safe">Hybrid, quantum-safe</span></td></tr>
+              <tr><td>Peer authentication</td><td>ECDSA, RSA, EAP, PSK</td><td><span class="pill classical">Classical only</span></td></tr>
+              <tr><td>ESP bulk encryption</td><td>AES-GCM-256</td><td><span class="pill safe">Quantum-safe</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <p>Hybrid key exchange defeats harvest-now-decrypt-later. Traffic recorded today cannot be decrypted later by an adversary who acquires a cryptanalytically relevant quantum computer.</p>
+
+        <div class="note">
+          <span class="nt">Boundary of the control</span>
+          <p>This does not defend against an adversary who already holds such a machine and forges a certificate signature to impersonate a gateway in real time. That gap closes when ML-DSA certificates and IKEv2 authentication profiles are available end to end. Be precise about this when reporting upward, because "our VPN is quantum-safe" overstates what is in place.</p>
+        </div>
+
+        <h3>1.2 How the exchange actually runs</h3>
+        <p>The classical exchange happens first, in <code class="inline">IKE_SA_INIT</code>, exactly as before. The ML-KEM public key and ciphertext then travel in a separate <code class="inline">IKE_INTERMEDIATE</code> round trip, before <code class="inline">IKE_AUTH</code>. Both shared secrets feed the final key material. If either primitive fails, the other still holds.</p>
+
+        <p>Two consequences follow. The handshake gains one round trip. And the ML-KEM-768 public key is 1184 bytes, which pushes the message past the 1280-byte size every IKEv2 implementation must handle without IP fragmentation, so IKE-layer fragmentation becomes mandatory rather than optional.</p>
+
+        <div class="note">
+          <span class="nt">Why the hybrid is structural</span>
+          <p>ML-KEM cannot be the initial IKE key exchange. A key encapsulation mechanism needs a request and a response to complete, which the initial exchange does not provide in the required form. An initial classical exchange is always necessary. Hybrid is therefore how IKEv2 works, not a transitional compromise you can later drop.</p>
+        </div>
+
+        <h3>1.3 Proposal keywords you will use</h3>
+        <div class="cards">
+          <div class="card" style="--b:var(--pub)">
+            <div class="docid">mlkem768</div>
+            <div class="t">ML-KEM-768, IANA 36</div>
+            <div class="d">Security strength category 3. NIST recommends this as the default parameter set. The right choice for general enterprise tunnels.</div>
+            <span class="tag">Default choice</span>
+          </div>
+          <div class="card">
+            <div class="docid">mlkem1024</div>
+            <div class="t">ML-KEM-1024, IANA 37</div>
+            <div class="d">Category 5. The parameter set named by CNSA 2.0, paired there with AES-256, SHA-384 and an initial P-384 exchange.</div>
+            <span class="tag">CNSA 2.0</span>
+          </div>
+          <div class="card">
+            <div class="docid">ke1_ &hellip; ke7_</div>
+            <div class="t">Additional exchange slot</div>
+            <div class="d">Prefix that places an algorithm in one of the seven RFC 9370 rounds after the initial exchange. Gaps are permitted, so slot 1 is simply conventional.</div>
+            <span class="tag">Syntax</span>
+          </div>
+          <div class="card" style="--b:var(--plan)">
+            <div class="docid">keX_none</div>
+            <div class="t">Optional round</div>
+            <div class="d">Makes a given round explicitly optional, so peers that cannot do it still connect. Useful during transition, and the thing to remove when you go strict.</div>
+            <span class="tag">Fallback</span>
+          </div>
+        </div>
+
+        <h3>1.4 A note on version numbers</h3>
+        <p>Upstream strongSwan has moved past 6.0.4. Canonical backports security fixes into the packaged version rather than tracking upstream point releases, which is normal for an LTS. Do not chase the upstream number. Track the Ubuntu package version and confirm the machine is current.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>apt policy strongswan-swanctl libstrongswan</code></pre></div>
+      </section>
+
+      <!-- 2 -->
+      <section id="s2">
+        <h2><span class="num">02</span>Verify the baseline</h2>
+        <p class="sect-sub">Four checks establish whether a host can do post-quantum key exchange at all.</p>
+
+        <h3>2.1 Install the right packages</h3>
+        <p>Use the <code class="inline">swanctl</code> and vici configuration backend, not the legacy <code class="inline">ipsec.conf</code> starter. The legacy backend is still packaged, and installing the <code class="inline">strongswan</code> metapackage pulls it in. Only one of the two daemons should be present.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo apt install -y strongswan-swanctl charon-systemd strongswan-pki
+sudo apt remove -y strongswan-starter strongswan-charon</code></pre></div>
+        <p>Confirm which daemon is active. Two units running at once is a common cause of configuration that appears to load but never takes effect.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>systemctl list-units 'strongswan*' --all --no-pager</code></pre></div>
+
+        <h3>2.2 Version</h3>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>swanctl --version</code></pre></div>
+        <p>Expect something close to the following. The Ubuntu suffix will differ as security updates land. The <code class="inline">6.0.4</code> part is what matters, and anything below 6.0.0 cannot do ML-KEM at all.</p>
+        <div class="code out"><pre><code>strongSwan 6.0.4</code></pre></div>
+
+        <h3>2.3 Confirm ML-KEM is loaded</h3>
+        <p>This is the check that decides whether the rest of the guide applies. It lists the algorithms the running daemon actually has, and the plugin providing each one.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo swanctl --list-algs | grep -i ml_kem</code></pre></div>
+        <div class="code out"><pre><code>ML_KEM_512[ml]
+ML_KEM_768[ml]
+ML_KEM_1024[ml]</code></pre></div>
+        <p>The name in brackets is the implementing plugin. It may read <code class="inline">[openssl]</code> instead of <code class="inline">[ml]</code>, which is equally valid. Ubuntu 26.04 ships OpenSSL 3.5, and the <code class="inline">openssl</code> plugin provides ML-KEM from that version onward. What matters is that the three names appear.</p>
+
+        <h3>2.4 If nothing is returned</h3>
+        <p>Work through these in order.</p>
+        <ol class="plain">
+          <li>Check which plugins loaded: <code class="inline">sudo swanctl --stats</code> prints the full list.</li>
+          <li>Check the OpenSSL version: <code class="inline">openssl version</code>. Below 3.5, the <code class="inline">openssl</code> plugin cannot supply ML-KEM.</li>
+          <li>Install the extra plugin set: <code class="inline">sudo apt install -y libstrongswan-extra-plugins</code>.</li>
+          <li>Check for a plugin disabled in configuration: <code class="inline">grep -r load /etc/strongswan.d/charon/ml.conf</code>.</li>
+          <li>Restart the daemon after any change, then repeat the check in 2.3.</li>
+        </ol>
+      </section>
+
+      <!-- 3 -->
+      <section id="s3">
+        <h2><span class="num">03</span>Configure the gateway</h2>
+        <p class="sect-sub">Post-quantum key exchange in strongSwan is one proposal string. Everything else in this section exists to make that string take effect and stay in place.</p>
+
+        <h3>3.1 Choose a posture</h3>
+
+        <h4>Strict, hybrid required</h4>
+        <p>Any peer that cannot do RFC 9370 additional key exchanges is refused. Aim for this on gateway-to-gateway tunnels, where you control both ends and the peer list is short and known.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>proposals = aes256gcm16-prfsha384-ecp384-ke1_mlkem1024</code></pre></div>
+        <p>That string is the CNSA 2.0 profile: AES-256 in GCM, SHA-384 as the pseudo-random function, an initial P-384 exchange and ML-KEM-1024 in the first additional round. For a general enterprise tunnel, ML-KEM-768 with X25519 is the more common pairing and carries a smaller payload.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>proposals = aes256gcm16-prfsha256-x25519-ke1_mlkem768</code></pre></div>
+
+        <h4>Preferred, with classical fallback</h4>
+        <p>Hybrid when both ends support it, classical when they do not. Appropriate for concentrators serving a mixed peer estate during transition. Separate proposals with a comma. Order sets preference, and strongSwan prefers its own configured order by default when acting as responder.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>proposals = aes256gcm16-prfsha384-ecp384-ke1_mlkem768, aes256gcm16-prfsha384-ecp384</code></pre></div>
+
+        <div class="note warn">
+          <span class="nt">The fallback is silent</span>
+          <p>A peer that drops to the second proposal produces no warning and no error. The tunnel comes up and looks healthy. Only test 1 in section 5 tells you which proposal was actually selected, which is why that test has to be per tunnel and repeated after every peer change.</p>
+        </div>
+
+        <div class="note">
+          <span class="nt">Sequencing</span>
+          <p>Do not go strict before completing the inventory in section 6. Cloud VPN endpoints, hardware concentrators and native operating system clients are the usual casualties.</p>
+        </div>
+
+        <h3>3.2 Write the connection file</h3>
+        <p>The packaged <code class="inline">/etc/swanctl/swanctl.conf</code> includes <code class="inline">conf.d/*.conf</code>. Use a drop-in there rather than editing the main file, so package upgrades do not conflict with your change. Confirm the include line is present first.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>grep -n 'include' /etc/swanctl/swanctl.conf</code></pre></div>
+        <p>A gateway-to-gateway tunnel with certificate authentication and hybrid key exchange on both the IKE SA and the Child SA:</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo tee /etc/swanctl/conf.d/60-pqc.conf &gt; /dev/null &lt;&lt;'EOF'
+# Hybrid post-quantum IKEv2. X25519 + ML-KEM-768.
+# Owner: &lt;team&gt;   Reviewed: 2026-08-03
+connections {
+    dc-a-to-dc-b {
+        version = 2
+        local_addrs  = 203.0.113.10
+        remote_addrs = 198.51.100.20
+
+        proposals = aes256gcm16-prfsha384-x25519-ke1_mlkem768
+        fragmentation = yes
+        dpd_delay = 30s
+
+        local {
+            auth  = pubkey
+            certs = gw-dc-a.pem
+            id    = gw-dc-a.example.gov.sg
+        }
+        remote {
+            auth = pubkey
+            id   = gw-dc-b.example.gov.sg
+        }
+
+        children {
+            net-to-net {
+                local_ts  = 10.10.0.0/16
+                remote_ts = 10.20.0.0/16
+                esp_proposals = aes256gcm16-x25519-ke1_mlkem768
+                start_action  = trap
+            }
+        }
+    }
+}
+EOF
+
+sudo chmod 600 /etc/swanctl/conf.d/60-pqc.conf</code></pre></div>
+
+        <h3>3.3 Fragmentation is not optional</h3>
+        <p>The ML-KEM payload will not fit in a single IKE message. Without IKE-layer fragmentation the exchange relies on IP fragmentation, which middleboxes and firewalls drop far more often. Set it explicitly rather than trusting the default, so the requirement is visible in the file to whoever reads it next.</p>
+        <p>If handshakes stall after <code class="inline">IKE_SA_INIT</code> succeeds, fragmentation is the first thing to check, followed by any firewall rule that treats UDP 4500 differently from UDP 500.</p>
+
+        <h3>3.4 Perfect forward secrecy on the Child SA</h3>
+        <p>The key exchange transform is mandatory for the IKE SA and optional for the Child SA. Omitting it means Child SA keys are derived from IKE SA material, so the post-quantum protection is inherited but not refreshed. Including <code class="inline">ke1_mlkem768</code> in <code class="inline">esp_proposals</code>, as above, gives each Child SA and each rekey its own hybrid exchange.</p>
+        <p>Since 6.0.2 the default ESP proposals include the supported key exchange methods along with <code class="inline">none</code>, which makes the exchange optional. Configure the proposal explicitly if you want it guaranteed.</p>
+
+        <h3>3.5 Load and validate</h3>
+        <p>Loading parses the file and reports errors. It does not restart anything, so it is safe to run on a live gateway.</p>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo swanctl --load-all
+sudo swanctl --list-conns</code></pre></div>
+        <p>Confirm the proposal printed back to you is exactly the one you wrote. A typo in an algorithm keyword is rejected outright, but a valid keyword in the wrong slot is accepted and quietly changes the security you get.</p>
+
+        <div class="note warn">
+          <span class="nt">Keep a way back in</span>
+          <p>If you administer the gateway over the tunnel you are changing, open a second path first, out of band or over the management network. Confirm the new configuration works before closing it.</p>
+        </div>
+
+        <h3>3.6 Raise logging while you test</h3>
+        <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo tee /etc/strongswan.d/charon-logging.conf &gt; /dev/null &lt;&lt;'EOF'
+charon-systemd {
+    journal {
+        default = 1
+        ike = 2
+        cfg = 2
+    }
+}
+EOF
+
+sudo systemctl restart strongswan
+journalctl -u strongswan -f</code></pre></div>
+        <p>Lower these values again once testing is complete. Level 2 on a busy concentrator produces a great deal of output.</p>
+      </section>
+
+      <!-- 4 -->
+      <section id="s4">
+        <h2><span class="num">04</span>Configure the remote peer</h2>
+        <p class="sect-sub">A proposal is a negotiation, not a setting. Configuring one end achieves nothing on its own.</p>
+
+        <p>On a second Ubuntu 26.04 gateway, mirror the file: swap <code class="inline">local_addrs</code> with <code class="inline">remote_addrs</code>, swap <code class="inline">local_ts</code> with <code class="inline">remote_ts</code>, swap the identities and certificates, and keep the proposal strings byte-identical. Mismatched proposals are the most common cause of a tunnel that will not establish after this change.</p>
+
+        <p>Where the peer is not strongSwan, the requirement is that it supports RFC 9370 additional key exchanges and RFC 9242 intermediate exchange, and that its own configuration names ML-KEM in the same round. Vendor syntax differs, and support varies widely by platform and software version. Confirm it from the vendor's documentation before assuming a tunnel will come up.</p>
+
+        <div class="note">
+          <span class="nt">Native operating system clients</span>
+          <p>The IKEv2 clients built into Windows, iOS and macOS do not negotiate RFC 9370 additional key exchanges. Remote access users on those clients will fail against a strict posture. The strongSwan Android client can do it, but only with the proposal configured explicitly in the profile. Treat remote access and gateway-to-gateway as separate migrations with separate timelines.</p>
+        </div>
+      </section>
+
+      <!-- 5 -->
+      <section id="s5">
+        <h2><span class="num">05</span>Testing</h2>
+        <p class="sect-sub">Six tests in increasing order of rigour. Run at least tests 1, 2 and 3.</p>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 1</span><span class="test-t">What was actually negotiated</span></div>
+          <p>The single most important check. Bring the tunnel up, then read the established SA.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo swanctl --initiate --child net-to-net
+sudo swanctl --list-sas</code></pre></div>
+          <p>The line that matters names the exchange in each round:</p>
+          <div class="code out"><pre><code>AES_GCM_16-256/PRF_HMAC_SHA2_384/CURVE_25519/KE1_ML_KEM_768</code></pre></div>
+          <p style="margin-bottom:0"><code class="inline">CURVE_25519</code> is the initial exchange. <code class="inline">KE1_ML_KEM_768</code> is the additional exchange in round one. If the <code class="inline">KE1_</code> element is absent, the tunnel is classical, whatever the configuration file says.</p>
+        </div>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 2</span><span class="test-t">Every proposal on the box</span></div>
+          <p>Test 1 tells you what one tunnel negotiated. This tells you what the gateway is configured to offer across all of them, and it catches the case a single tunnel test misses: a second drop-in file, written for another connection, carrying a classical proposal.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo swanctl --load-all
+grep -Hn 'proposals' /etc/swanctl/swanctl.conf /etc/swanctl/conf.d/*.conf</code></pre></div>
+          <p>The first command names every connection it loaded, so a file that failed to parse or was never picked up is visible immediately. The second lists every proposal line with its file and line number.</p>
+          <p style="margin-bottom:0">Under a strict posture, every line returned should contain a <code class="inline">ke1_</code> element. Any that does not is a tunnel with no post-quantum protection, whatever the rest of the estate looks like.</p>
+        </div>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 3</span><span class="test-t">Negative test</span></div>
+          <p>A positive test alone is weak evidence. It proves the preferred path works, not that the classical path is closed. On the initiating gateway only, strip the post-quantum element from the proposal and confirm the responder refuses the connection. Take a copy first.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo cp /etc/swanctl/conf.d/60-pqc.conf /tmp/60-pqc.conf.bak
+sudo sed -i 's/-ke1_mlkem[0-9]*//g' /etc/swanctl/conf.d/60-pqc.conf
+sudo swanctl --load-all
+sudo swanctl --initiate --child net-to-net</code></pre></div>
+          <p>Under strict enforcement on the responder, expect the exchange to fail:</p>
+          <div class="code out"><pre><code>received NO_PROPOSAL_CHOSEN notify error
+establishing IKE_SA failed, peer not responding</code></pre></div>
+          <p>Restore the file and reload before doing anything else.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo cp /tmp/60-pqc.conf.bak /etc/swanctl/conf.d/60-pqc.conf
+sudo swanctl --load-all
+sudo swanctl --list-sas</code></pre></div>
+          <p style="margin-bottom:0">A tunnel that comes up during the test means the responder still accepts classical key exchange. This is the test that catches a drop-in written but never loaded, and a responder still carrying a fallback proposal someone forgot to remove.</p>
+        </div>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 4</span><span class="test-t">Pin each parameter set individually</span></div>
+          <p>Verify each parameter set you intend to accept, rather than trusting negotiation to select the one you expect. Run this only if the responder is configured to accept more than one.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo cp /etc/swanctl/conf.d/60-pqc.conf /tmp/60-pqc.conf.bak
+
+for k in mlkem768 mlkem1024; do
+  printf '%-11s ' "$k"
+  sudo sed -i "s/ke1_mlkem[0-9]*/ke1_$k/g" /etc/swanctl/conf.d/60-pqc.conf
+  sudo swanctl --load-all &gt;/dev/null 2&gt;&amp;1
+  sudo swanctl --initiate --child net-to-net &gt;/dev/null 2&gt;&amp;1 &amp;&amp; echo OK || echo FAIL
+  sudo swanctl --terminate --ike dc-a-to-dc-b &gt;/dev/null 2&gt;&amp;1
+done
+
+sudo cp /tmp/60-pqc.conf.bak /etc/swanctl/conf.d/60-pqc.conf
+sudo swanctl --load-all</code></pre></div>
+          <p style="margin-bottom:0">A <code class="inline">FAIL</code> here is not necessarily a fault. It usually means the responder does not offer that parameter set, which is worth knowing before someone changes the initiator and cannot explain why the tunnel stopped.</p>
+        </div>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 5</span><span class="test-t">Prove it on the wire</span></div>
+          <p>Independent of anything strongSwan reports about itself. Capture the handshake and look for the intermediate exchange.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>sudo tcpdump -i any --immediate-mode -U -n 'port 500 or port 4500' -w /tmp/pqc.pcap &amp;
+TCPDUMP_PID=$!
+sleep 1
+sudo swanctl --initiate --child net-to-net
+sleep 1
+sudo kill $TCPDUMP_PID</code></pre></div>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>tcpdump -r /tmp/pqc.pcap -n -vv 2&gt;/dev/null | grep -E 'parent_sa|child_sa'</code></pre></div>
+          <p>A classical handshake goes straight from the initial exchange to authentication. A hybrid handshake has an extra exchange wedged between them, shown as <code class="inline">#43</code> because tcpdump has no name for exchange type 43. Seeing <code class="inline">#43</code> is the proof that the post-quantum round trip happened.</p>
+          <div class="code out"><pre><code>parent_sa ikev2_init[I]
+parent_sa ikev2_init[R]
+child_sa  #43[I]        &lt;- ML-KEM public key, fragment 1
+child_sa  #43[I]        &lt;- fragment 2
+child_sa  #43[R]        &lt;- ML-KEM ciphertext
+child_sa  ikev2_auth[I]
+child_sa  ikev2_auth[R]</code></pre></div>
+          <p style="margin-bottom:0">The two fragments in the request are the expected behaviour, not a fault. They are the 1184-byte ML-KEM public key crossing the 1280-byte message ceiling once headers are added.</p>
+        </div>
+
+        <div class="test">
+          <div class="test-h"><span class="test-n">Test 6</span><span class="test-t">Measure the cost</span></div>
+          <p>Bring numbers when someone asks about performance impact.</p>
+          <div class="code"><button class="copy" type="button">Copy</button><pre><code>for i in $(seq 1 20); do
+  sudo swanctl --terminate --ike dc-a-to-dc-b &gt;/dev/null 2&gt;&amp;1
+  ( time sudo swanctl --initiate --child net-to-net &gt;/dev/null 2&gt;&amp;1 ) 2&gt;&amp;1 | grep real
+done</code></pre></div>
+          <p>Run it once with the hybrid proposal and once with the classical proposal, then compare. Published measurements on a local network put the difference at roughly one millisecond, almost all of it the extra round trip rather than the arithmetic. The authentication exchange is unchanged in size. The whole cost of the hybrid sits in that one added round trip, about two kilobytes.</p>
+          <p style="margin-bottom:0"><strong>Sequencing note.</strong> This test needs the classical proposal still available for comparison. Run it before applying the strict posture, or against a staging pair.</p>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section id="s6">
+        <h2><span class="num">06</span>Compatibility checklist</h2>
+        <p class="sect-sub">Test each of these against a candidate gateway before requiring hybrid key exchange. This is where rollouts fail.</p>
+
+        <ul class="check">
+          <li>Peer gateways running strongSwan below 6.0.0, which cannot do ML-KEM at any version of the configuration</li>
+          <li>Hardware VPN concentrators and firewalls terminating IPsec, each on its own software timeline</li>
+          <li>Cloud provider VPN gateways, where the proposal set is fixed by the provider and not by you</li>
+          <li>Remote access users on native Windows, iOS and macOS clients</li>
+          <li>Firewalls and middleboxes that drop fragmented IKE, or that treat UDP 4500 differently from UDP 500</li>
+          <li>Path MTU on the tunnel path, particularly over links with tunnelling already in place</li>
+          <li>Any peer behind NAT, where fragmented exchanges are more fragile</li>
+          <li>Monitoring and alerting that parses tunnel status output, since the proposal string it reads will change shape</li>
+          <li>High availability pairs, which must be upgraded together or will fail over into a classical configuration</li>
+        </ul>
+
+        <p>For anything that fails, upgrade it. If that is not possible, carve out a narrow exception with a separate connection definition and a permissive proposal, rather than weakening the proposal on the connections that already work.</p>
+
+        <div class="note">
+          <span class="nt">An interim option for old peers</span>
+          <p>RFC 8784 post-quantum preshared keys mix an out-of-band secret into the key derivation, giving quantum resistance without any post-quantum algorithm on the wire. strongSwan has supported this since 5.7.0, via <code class="inline">ppk_id</code> on the connection and a <code class="inline">ppk</code> section in secrets. It suits peers that cannot be upgraded, at the cost of distributing and rotating a shared secret. It is a different control with a different key management burden, so scope it as its own piece of work.</p>
+        </div>
+
+        <p>Record every exception with an owner and a review date. An exception without a review date becomes permanent.</p>
+      </section>
+
+      <!-- 7 -->
+      <section id="s7">
+        <h2><span class="num">07</span>Evidence to record</h2>
+        <p class="sect-sub">Capture the following per gateway pair for an audit or assurance file.</p>
+        <ol class="plain">
+          <li><code class="inline">swanctl --version</code> and <code class="inline">apt policy strongswan-swanctl</code> output</li>
+          <li><code class="inline">sudo swanctl --list-algs | grep -i ml_kem</code> output, showing the algorithm is available</li>
+          <li>Test 1 output, showing the negotiated proposal including the <code class="inline">KE1_ML_KEM</code> element</li>
+          <li>Test 3 output, showing that classical key exchange is refused</li>
+          <li>Test 5 capture, or the filtered line list, showing the intermediate exchange</li>
+          <li>The connection file itself, with its owner and review date</li>
+          <li>Date of the check and the name of the person who ran it</li>
+        </ol>
+        <div class="note">
+          <span class="nt">Why items 3 and 4 matter</span>
+          <p>Together they are what distinguish a verified control from a configured one. Configuration evidence alone proves intent. Only the negative test proves the classical path is actually closed, and on a negotiated protocol that is the difference that counts.</p>
+        </div>
+      </section>
+
+      <!-- 8 -->
+      <section id="s8">
+        <h2><span class="num">08</span>What this does not cover</h2>
+        <p class="sect-sub">Be precise about the boundary when reporting this work upward.</p>
+        <ul>
+          <li><strong>Authentication remains classical.</strong> Gateway and user authentication still rests on ECDSA or RSA certificates, or on preshared keys and EAP. ML-DSA certificates are not part of this configuration. Plan a rotation for when post-quantum certificate support is available across your PKI, your gateways and your peers.</li>
+          <li><strong>IKEv1 is out of scope entirely.</strong> It has no equivalent mechanism. Tunnels still running IKEv1 need migrating to IKEv2 before any of this applies.</li>
+          <li><strong>The ESP data plane was already fine.</strong> AES-GCM with a 256-bit key is quantum-safe with adequate key length. Nothing here changes it, and nothing needed to.</li>
+          <li><strong>Both ends, every time.</strong> A hybrid-capable gateway reached by a classical peer negotiates classical key exchange, and the traffic is not protected against harvest-now-decrypt-later. Peer estate coverage is the harder half of the problem, and section 6 is where it starts.</li>
+          <li><strong>Other services need separate assessment.</strong> TLS, SSH, certificate issuance and application-layer cryptography each have their own migration path and their own timelines.</li>
+        </ul>
+      </section>
+
+      <!-- 9 -->
+      <section id="s9">
+        <h2><span class="num">09</span>Command reference</h2>
+        <p class="sect-sub">Every command in this guide, in one place.</p>
+        <div class="tblwrap">
+          <table>
+            <thead><tr><th>Task</th><th>Command</th></tr></thead>
+            <tbody>
+              <tr><td>Package version and updates</td><td><code>apt policy strongswan-swanctl</code></td></tr>
+              <tr><td>strongSwan version</td><td><code>swanctl --version</code></td></tr>
+              <tr><td>Which daemon is active</td><td><code>systemctl list-units 'strongswan*' --all</code></td></tr>
+              <tr><td>Algorithms available to the daemon</td><td><code>sudo swanctl --list-algs | grep -i ml_kem</code></td></tr>
+              <tr><td>Loaded plugins and counters</td><td><code>sudo swanctl --stats</code></td></tr>
+              <tr><td>Load configuration and credentials</td><td><code>sudo swanctl --load-all</code></td></tr>
+              <tr><td>Loaded connection definitions</td><td><code>sudo swanctl --list-conns</code></td></tr>
+              <tr><td>Bring a tunnel up</td><td><code>sudo swanctl --initiate --child &lt;child&gt;</code></td></tr>
+              <tr><td>Negotiated proposal on live SAs</td><td><code>sudo swanctl --list-sas</code></td></tr>
+              <tr><td>Tear a tunnel down</td><td><code>sudo swanctl --terminate --ike &lt;conn&gt;</code></td></tr>
+              <tr><td>Follow the daemon log</td><td><code>journalctl -u strongswan -f</code></td></tr>
+              <tr><td>Capture the handshake</td><td><code>sudo tcpdump -n 'port 500 or port 4500' -w /tmp/pqc.pcap</code></td></tr>
+              <tr><td>Filter to one line per IKE message</td><td><code>tcpdump -r /tmp/pqc.pcap -n -vv | grep -E 'parent_sa|child_sa'</code></td></tr>
+              <tr><td>Hybrid IKE proposal, general use</td><td><code>aes256gcm16-prfsha384-x25519-ke1_mlkem768</code></td></tr>
+              <tr><td>Hybrid IKE proposal, CNSA 2.0</td><td><code>aes256gcm16-prfsha384-ecp384-ke1_mlkem1024</code></td></tr>
+              <tr><td>Hybrid ESP proposal</td><td><code>aes256gcm16-x25519-ke1_mlkem768</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer>
+        <p><b>Sources.</b></p>
+        <ul>
+          <li><a href="https://docs.strongswan.org/docs/latest/config/proposals.html" target="_blank" rel="noopener">strongSwan documentation, algorithm proposals and key exchange methods</a></li>
+          <li><a href="https://strongswan.org/blog/2024/12/03/strongswan-6.0.0-released.html" target="_blank" rel="noopener">strongSwan 6.0.0 release announcement, multiple key exchanges and ML-KEM</a></li>
+          <li><a href="https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html" target="_blank" rel="noopener">swanctl.conf reference</a></li>
+          <li><a href="https://packages.ubuntu.com/resolute/strongswan" target="_blank" rel="noopener">Ubuntu 26.04 LTS strongSwan package</a></li>
+          <li><a href="https://www.rfc-editor.org/info/rfc9370" target="_blank" rel="noopener">RFC 9370, multiple key exchanges in IKEv2</a></li>
+          <li><a href="https://www.rfc-editor.org/info/rfc9242" target="_blank" rel="noopener">RFC 9242, intermediate exchange in IKEv2</a></li>
+          <li><a href="https://www.rfc-editor.org/info/rfc8784" target="_blank" rel="noopener">RFC 8784, mixing preshared keys in IKEv2 for post-quantum security</a></li>
+          <li><a href="https://csrc.nist.gov/pubs/fips/203/final" target="_blank" rel="noopener">NIST FIPS 203, ML-KEM</a></li>
+          <li><a href="https://blogs.cisco.com/developer/watch-a-hybrid-post-quantum-handshake-on-the-wire-ipsec-series-part-4" target="_blank" rel="noopener">Cisco, hybrid post-quantum IKEv2 handshake observed on the wire</a></li>
+        </ul>
+        <p style="margin-top:14px"><b>Before relying on this for compliance,</b> confirm the packaged strongSwan version on your own gateways and the proposal actually negotiated on each tunnel. Package versions move with security updates, and on a negotiated protocol the configured proposal and the selected proposal are not the same thing.</p>
+      </footer>
+
+    </section>
+  </div>
+</div>
+
+<script>
+/* Theme toggle: follows OS preference, explicit override wins. No storage. */
+(function initThemeToggle(){
+  const root = document.documentElement;
+  const btn = document.getElementById("theme-toggle");
+  const media = window.matchMedia("(prefers-color-scheme:dark)");
+  function effectiveIsDark(){
+    const explicit = root.getAttribute("data-theme");
+    if (explicit === "dark") return true;
+    if (explicit === "light") return false;
+    return media.matches;
+  }
+  function syncLabel(){
+    const label = effectiveIsDark() ? "Switch to light mode" : "Switch to dark mode";
+    btn.setAttribute("aria-label", label);
+    btn.setAttribute("title", label);
+  }
+  btn.addEventListener("click", ()=>{
+    root.setAttribute("data-theme", effectiveIsDark() ? "light" : "dark");
+    syncLabel();
+  });
+  media.addEventListener("change", ()=>{ if(!root.getAttribute("data-theme")) syncLabel(); });
+  syncLabel();
+})();
+
+/* Copy buttons on command blocks */
+document.querySelectorAll(".code .copy").forEach(btn=>{
+  btn.addEventListener("click", async ()=>{
+    const code = btn.parentElement.querySelector("code");
+    if(!code) return;
+    try{
+      await navigator.clipboard.writeText(code.textContent);
+    }catch(e){
+      const r=document.createRange(); r.selectNodeContents(code);
+      const s=window.getSelection(); s.removeAllRanges(); s.addRange(r);
+      try{ document.execCommand("copy"); }catch(_){}
+      s.removeAllRanges();
+    }
+    btn.textContent="Copied"; btn.classList.add("done");
+    setTimeout(()=>{ btn.textContent="Copy"; btn.classList.remove("done"); }, 1600);
+  });
+});
+
+/* Active section highlight in the contents list */
+(function initScrollSpy(){
+  const links = [...document.querySelectorAll("nav.toc a")];
+  const map = new Map(links.map(a=>[a.getAttribute("href").slice(1), a]));
+  const obs = new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      const a = map.get(en.target.id);
+      if(!a) return;
+      if(en.isIntersecting){
+        links.forEach(l=>l.classList.remove("on"));
+        a.classList.add("on");
+      }
+    });
+  }, { rootMargin:"0px 0px -70% 0px", threshold:0 });
+  document.querySelectorAll("section.doc > section[id]").forEach(s=>obs.observe(s));
+})();
+</script>
+</body>
+</html>
